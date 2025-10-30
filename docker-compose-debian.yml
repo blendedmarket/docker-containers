@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  tunnel:
+    image: debian:bookworm-slim
+    environment:
+      - DEBIAN_FRONTEND=noninteractive
+      - TUNNEL_MODE=quick
+      - TUNNEL_URL=http://localhost:3000
+    volumes:
+      - .:/app
+      - /var/run/docker.sock:/var/run/docker.sock  # Optional: for Docker-in-Docker if needed
+    working_dir: /app
+    stdin_open: true
+    tty: true
+    # Install cloudflared and Node.js on startup, then provide interactive shell
+    command: >
+      bash -c "
+      echo 'Installing dependencies...' &&
+      apt-get update &&
+      apt-get install -y --no-install-recommends ca-certificates curl bash git gnupg &&
+      mkdir -p --mode=0755 /usr/share/keyrings &&
+      curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | tee /usr/share/keyrings/cloudflare-main.gpg >/dev/null &&
+      echo 'deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main' | tee /etc/apt/sources.list.d/cloudflared.list &&
+      apt-get update &&
+      apt-get install -y --no-install-recommends cloudflared &&
+      curl -fsSL https://deb.nodesource.com/setup_22.x | bash - &&
+      apt-get install -y nodejs &&
+      rm -rf /var/lib/apt/lists/* &&
+      echo 'Installation complete!' &&
+      echo 'Available commands: cloudflared, node, npm' &&
+      echo 'Quick tunnel example: cloudflared tunnel --url http://localhost:3000' &&
+      bash"
+    networks:
+      - tunnel-network
+
+networks:
+  tunnel-network:
+    driver: bridge

@@ -1,0 +1,55 @@
+services:
+  tunnel:
+    image: alpine:latest
+    environment:
+      - TUNNEL_MODE=quick
+      - TUNNEL_URL=http://localhost:3000
+      - TUNNEL_ORIGIN_CERT=
+    volumes:
+      - .:/app
+      - /var/run/docker.sock:/var/run/docker.sock  # Optional: for Docker-in-Docker if needed
+    working_dir: /app
+    stdin_open: true
+    tty: true
+    # Simple approach: always install and provide bash shell
+    command: >
+      sh -c "
+      echo 'Installing dependencies on Alpine...' &&
+      apk update &&
+      apk add --no-cache bash curl git ca-certificates openssl &&
+      echo 'Updating CA certificates...' &&
+      update-ca-certificates &&
+      echo 'Installing cloudflared...' &&
+      curl -L --retry 3 --retry-delay 2 --connect-timeout 30 --max-time 300 https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /usr/local/bin/cloudflared &&
+      chmod +x /usr/local/bin/cloudflared &&
+      echo 'Installing Node.js...' &&
+      apk add --no-cache nodejs npm &&
+      echo 'Installation complete!' &&
+      echo 'Testing cloudflared...' &&
+      /usr/local/bin/cloudflared --version &&
+      echo 'Available commands: cloudflared, node, npm' &&
+      echo '' &&
+      echo 'QUICK TUNNEL COMMANDS:' &&
+      echo 'cloudflared tunnel --url http://host.docker.internal:3000' &&
+      echo 'cloudflared tunnel --url http://host.docker.internal:8080' &&
+      echo '' &&
+      echo 'ALTERNATIVE SYNTAX (if above fails):' &&
+      echo 'cloudflared tunnel run --url http://host.docker.internal:3000' &&
+      echo '' &&
+      echo 'NOTE: Use host.docker.internal instead of localhost' &&
+      echo 'to access services running on your host machine' &&
+      echo '' &&
+      echo 'PERSISTENT TUNNEL (requires login):' &&
+      echo 'cloudflared tunnel login' &&
+      echo 'cloudflared tunnel create my-tunnel' &&
+      echo 'cloudflared tunnel run my-tunnel' &&
+      echo '' &&
+      echo 'Starting bash shell...' &&
+      exec bash
+      "
+    networks:
+      - tunnel-network
+
+networks:
+  tunnel-network:
+    driver: bridge
